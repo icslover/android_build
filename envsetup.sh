@@ -120,13 +120,17 @@ function setpaths()
     prebuiltdir=$(getprebuilt)
     gccprebuiltdir=$(get_abs_build_var ANDROID_GCC_PREBUILTS)
 
+    # defined in core/config.mk
+    targetgccversion=$(get_build_var TARGET_GCC_VERSION)
+    export TARGET_GCC_VERSION=$targetgccversion
+
     # The gcc toolchain does not exists for windows/cygwin. In this case, do not reference it.
     export ANDROID_EABI_TOOLCHAIN=
     local ARCH=$(get_build_var TARGET_ARCH)
     case $ARCH in
         x86) toolchaindir=x86/i686-linux-android-4.6/bin
             ;;
-        arm) toolchaindir=arm/arm-linux-androideabi-4.6/bin
+        arm) toolchaindir=arm/arm-linux-androideabi-$targetgccversion/bin
             ;;
         mips) toolchaindir=mips/mipsel-linux-android-4.6/bin
             ;;
@@ -142,7 +146,7 @@ function setpaths()
     unset ARM_EABI_TOOLCHAIN ARM_EABI_TOOLCHAIN_PATH
     case $ARCH in
         arm)
-            toolchaindir=arm/arm-eabi-4.6/bin
+            toolchaindir=arm/arm-eabi-$targetgccversion/bin
             if [ -d "$gccprebuiltdir/$toolchaindir" ]; then
                  export ARM_EABI_TOOLCHAIN="$gccprebuiltdir/$toolchaindir"
                  ARM_EABI_TOOLCHAIN_PATH=":$gccprebuiltdir/$toolchaindir"
@@ -435,7 +439,7 @@ function print_lunch_menu()
     echo
     echo "You're building on" $uname
     echo
-    if [ "z${ROOTBOX_DEVICES_ONLY}" != "z" ]; then
+    if [ "z${AOSP_DEVICES_ONLY}" != "z" ]; then
        echo "Breakfast menu... pick a combo:"
     else
        echo "Lunch menu... pick a combo:"
@@ -449,7 +453,7 @@ function print_lunch_menu()
         i=$(($i+1))
     done
 
-    if [ "z${ROOTBOX_DEVICES_ONLY}" != "z" ]; then
+    if [ "z${AOSP_DEVICES_ONLY}" != "z" ]; then
        echo "... and don't forget the bacon!"
     fi
 
@@ -471,10 +475,10 @@ function brunch()
 function breakfast()
 {
     target=$1
-    ROOTBOX_DEVICES_ONLY="true"
+    AOSP_DEVICES_ONLY="true"
     unset LUNCH_MENU_CHOICES
     add_lunch_combo full-eng
-    for f in `/bin/ls vendor/rootbox/vendorsetup.sh 2> /dev/null`
+    for f in `/bin/ls vendor/aosp/vendorsetup.sh 2> /dev/null`
         do
             echo "including $f"
             . $f
@@ -490,7 +494,8 @@ function breakfast()
             # A buildtype was specified, assume a full device name
             lunch $target
         else
-            lunch rootbox_$target-userdebug
+            # This is probably just the Xylon model name
+            lunch xylon_$target-userdebug
         fi
     fi
     return $?
@@ -620,85 +625,6 @@ function tapas()
 
     set_stuff_for_environment
     printconfig
-}
-
-function installboot()
-{
-    if [ ! -e "$OUT/recovery/root/etc/recovery.fstab" ];
-    then
-        echo "No recovery.fstab found. Build recovery first."
-        return 1
-    fi
-    if [ ! -e "$OUT/boot.img" ];
-    then
-        echo "No boot.img found. Run make bootimage first."
-        return 1
-    fi
-    PARTITION=`grep "^\/boot" $OUT/recovery/root/etc/recovery.fstab | awk {'print $3'}`
-    PARTITION_TYPE=`grep "^\/boot" $OUT/recovery/root/etc/recovery.fstab | awk {'print $2'}`
-    if [ -z "$PARTITION" ];
-    then
-        echo "Unable to determine boot partition."
-        return 1
-    fi
-    adb start-server
-    adb root
-    sleep 1
-    adb wait-for-device
-    adb remount
-    adb wait-for-device
-    if (adb shell cat /system/build.prop | grep -q "ro.cm.device=$CM_BUILD");
-    then
-        adb push $OUT/boot.img /cache/
-        for i in $OUT/system/lib/modules/*;
-        do
-            adb push $i /system/lib/modules/
-        done
-        if [ "$PARTITION_TYPE" == "mtd" ];
-        then
-            adb shell flash_image $PARTITION /cache/boot.img
-        else
-            adb shell dd if=/cache/boot.img of=$PARTITION
-        fi
-        adb shell chmod 644 /system/lib/modules/*
-        echo "Installation complete."
-    else
-        echo "The connected device does not appear to be $CM_BUILD, run away!"
-    fi
-}
-
-function installrecovery()
-{
-    if [ ! -e "$OUT/recovery/root/etc/recovery.fstab" ];
-    then
-        echo "No recovery.fstab found. Build recovery first."
-        return 1
-    fi
-    if [ ! -e "$OUT/recovery.img" ];
-    then
-        echo "No recovery.img found. Run make recoveryimage first."
-        return 1
-    fi
-    PARTITION=`grep "^\/recovery" $OUT/recovery/root/etc/recovery.fstab | awk {'print $3'}`
-    if [ -z "$PARTITION" ];
-    then
-        echo "Unable to determine recovery partition."
-        return 1
-    fi
-    adb start-server
-    adb root
-    sleep 1
-    adb wait-for-device
-    adb remount
-    adb wait-for-device
-    if (adb shell cat /system/build.prop | grep -q "ro.cm.device=$CM_BUILD");
-    then
-        adb push $OUT/recovery.img /cache/
-        adb shell dd if=/cache/recovery.img of=$PARTITION
-        echo "Installation complete."
-    else
-        echo "The connected device does not appear to be $CM_BUILD, run away!"
-    fi
 }
 
 function eat()
@@ -1310,7 +1236,7 @@ function mka() {
 function mbot() {
     unset LUNCH_MENU_CHOICES
     croot
-    ./vendor/rootbox/bot/deploy.sh
+    ./vendor/aosp/bot/deploy.sh
 }
 
 function mkapush() {
