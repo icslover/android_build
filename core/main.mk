@@ -122,7 +122,7 @@ endif
 
 
 # Check for the correct version of java
-java_version := $(shell java -version 2>&1 | head -n 1 | grep '^java .*[ "]1\.6[\. "$$]')
+java_version := $(shell java -version 2>&1 | head -n 1 | grep '^java .*[ "]1\.[67][\. "$$]')
 ifneq ($(shell java -version 2>&1 | grep -i openjdk),)
 java_version :=
 endif
@@ -132,7 +132,7 @@ $(info You are attempting to build with an unsupported version)
 $(info of java.)
 $(info $(space))
 $(info Your version is: $(shell java -version 2>&1 | head -n 1).)
-$(info The correct version is: Java SE 1.6.)
+$(info The correct version is: Java SE 1.6 or 1.7.)
 $(info $(space))
 $(info Please follow the machine setup instructions at)
 $(info $(space)$(space)$(space)$(space)https://source.android.com/source/download.html)
@@ -140,14 +140,14 @@ $(info ************************************************************)
 endif
 
 # Check for the correct version of javac
-javac_version := $(shell javac -version 2>&1 | head -n 1 | grep '[ "]1\.6[\. "$$]')
+javac_version := $(shell javac -version 2>&1 | head -n 1 | grep '[ "]1\.[67][\. "$$]')
 ifeq ($(strip $(javac_version)),)
 $(info ************************************************************)
 $(info You are attempting to build with the incorrect version)
 $(info of javac.)
 $(info $(space))
 $(info Your version is: $(shell javac -version 2>&1 | head -n 1).)
-$(info The correct version is: 1.6.)
+$(info The correct version is: 1.6 or 1.7.)
 $(info $(space))
 $(info Please follow the machine setup instructions at)
 $(info $(space)$(space)$(space)$(space)https://source.android.com/source/download.html)
@@ -155,39 +155,7 @@ $(info ************************************************************)
 $(error stop)
 endif
 
-ifeq (darwin,$(HOST_OS))
-GCC_REALPATH = $(realpath $(shell which gcc))
-ifneq ($(findstring llvm-gcc,$(GCC_REALPATH)),)
-  # Using LLVM GCC results in a non functional emulator due to it
-  # not honouring global register variables
-  $(warning ****************************************)
-  $(warning * gcc is linked to llvm-gcc which will *)
-  $(warning * not create a useable emulator.       *)
-  $(warning ****************************************)
-  BUILD_EMULATOR := false
-else
-  BUILD_EMULATOR := true
-endif
-# When building on Leopard or above, we need to use the 10.4 SDK
-# or the generated binary will not run on Tiger.
-darwin_version := $(strip $(shell sw_vers -productVersion))
-ifneq ($(filter 10.1 10.2 10.3 10.1.% 10.2.% 10.3.% 10.4 10.4.%,$(darwin_version)),)
-    $(error Building the Android emulator requires OS X 10.5 or above)
-endif
-ifneq ($(filter 10.5 10.5.% 10.6 10.6.%,$(darwin_version)),)
-    # We are on Leopard or Snow Leopard
-    MSDK=10.5
-else
-    # We are on Lion or beyond, and 10.6 SDK is the minimum in Xcode 4.x
-   MSDK=10.6
-endif
-MACOSX_SDK := /Developer/SDKs/MacOSX$(MSDK).sdk
-ifeq ($(strip $(wildcard $(MACOSX_SDK))),)
-  BUILD_EMULATOR := false
-endif
-else   # HOST_OS is not darwin
-  BUILD_EMULATOR := true
-endif  # HOST_OS is darwin
+BUILD_EMULATOR := false
 
 $(shell echo 'VERSIONS_CHECKED := $(VERSION_CHECK_SEQUENCE_NUMBER)' \
         > $(OUT_DIR)/versions_checked.mk)
